@@ -16,6 +16,14 @@ extern "C" {
 #define INA226_POWERLSB_INV	  1 / (INA226_CURRENTLSB * 25)	 // bit/mW
 #define INA226_I2CTIMEOUT	  10
 
+// current_lsb = maxExpectedCurrent / 32768
+// calib = 0.00512 / (current_lsb * r_shunt)
+extern float current_lsb;             // 电流最小分辨率（动态值）与应用（校准值）相关
+// power_lsb = current_lsb * 25
+extern float power_lsb;               // 功率最小分辨率（动态值）与应用（校准值）相关
+#define INA226_BUSV_LSB   0.00125f    // 总线电压最小分辨率（固定值） 1.25mV/bit，满量程 40.96V
+#define INA226_SHUNTV_LSB 0.0000025f  // 分流电压最小分辨率（固定值） 2.5uV/bit，满量程 81.92mV
+
 #define INA226_CONFIG	0x00   // Configuration Register (R/W)
 #define INA226_SHUNTV	0x01   // Shunt Voltage ®
 #define INA226_BUSV		0x02   // Bus Voltage ®
@@ -86,25 +94,41 @@ extern "C" {
 #define INA226_MANUF_ID_DEFAULT 0x5449
 #define INA226_DIE_ID_DEFAULT	0x2260
 
-float INA226_getBusV (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress);
-float INA226_getCurrent (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress);
-float INA226_getPower (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress);
+// #define
 
-uint8_t INA226_setConfig (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress, uint16_t ConfigWord);
-uint16_t INA226_getConfig (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress);
-uint16_t INA226_getShuntV (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress);
-uint16_t INA226_getBusVReg (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress);
-uint16_t INA226_getPowerReg (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress);
-uint8_t INA226_setCalibrationReg (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress, uint16_t ConfigWord);
-uint16_t INA226_getCalibrationReg (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress);
-uint16_t INA226_getCurrentReg (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress);
-uint16_t INA226_getManufID (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress);
-uint16_t INA226_getDieID (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress);
-uint8_t INA226_setMaskEnable (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress, uint16_t ConfigWord);
-uint16_t INA226_getMaskEnable (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress);
-uint8_t INA226_setAlertLimit (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress, uint16_t ConfigWord);
-uint16_t INA226_getAlertLimit (I2C_HandleTypeDef* I2CHandler, uint16_t DevAddress);
+/**
+ * @brief INA226 初始化
+ * @param config INA226配置寄存器
+ * @param r_shunt 采样电阻值(mΩ)
+ */
+void ina226_init(uint16_t config, float r_shunt, float maxExpectedCurrent_);
 
+/**
+ * @brief INA226 读取电压数值寄存器
+ */
+float ina226_getBusV (void);
+float ina226_getCurrent (void);
+float ina226_getPower (void);
+uint16_t ina226_getPowerReg(void);
+uint8_t ina226_setConfig(uint16_t config);
+uint16_t ina226_getConfig(void);
+uint16_t ina226_getShuntV (void);
+uint8_t ina226_setCalibrationReg (uint16_t config);
+uint16_t ina226_getCalibrationReg (void);
+uint16_t ina226_getManufID (void);
+uint16_t ina226_getDieID (void);
+uint8_t ina226_setMaskEnable (uint16_t config);
+uint16_t ina226_getMaskEnable (void);
+uint8_t ina226_setAlertLimit (uint16_t config);
+uint16_t ina226_getAlertLimit (void);
+
+
+// 用户自定义函数
+uint8_t ina226_writeReg (uint16_t regAddress, uint16_t regValue);
+// 无符号读取寄存器
+uint16_t ina226_readReg (uint16_t regAddress);
+// 带符号读取寄存器
+int16_t ina226_readRegS (uint16_t regAddress);
 
 #ifdef __cplusplus
 }

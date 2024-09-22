@@ -31,6 +31,39 @@ bool CH217_OUT_FLAG = true;
 
 
 
+
+float bus_voltage;
+int16_t current_raw;
+float current;
+uint16_t power_raw;
+float power;
+float power_sum = 0;
+
+
+void ina226_sample(void) {
+	bus_voltage = ina226_getBusV();
+	current = ina226_getCurrent();
+	power_raw = ina226_getPowerReg();
+	power = ina226_getPower();
+
+	// 将电压、电流、功率数据传给上位机
+	str_len = xsprintf(strbuf, "ina226: %.4f, %.4f, %.4f\r\n", bus_voltage, current, current_lsb*1000);
+	HAL_UART_Transmit_DMA(&huart2, (const uint8_t*)strbuf, str_len);
+}
+// /**
+//  * @brief  初始化INA226
+//  * @param  rShuntValue: 采样电阻值
+//  * @param  iMaxExpected: 期望最大电流值
+//  */
+// void calibrate(float rShuntValue, float iMaxExpected) {
+// 	uint16_t calibrationValue;
+
+// 	float iMaxP
+// }
+
+
+
+
 uint16_t returnmax(uint16_t* list, uint8_t len) {
 	uint16_t max = 0;
 	for (uint8_t i = 0; i < len; i++) {
@@ -131,66 +164,11 @@ public:
 } power_bar;
 
 
-
-
-float bus_voltage;
-int16_t current_raw;
-float current;
-uint16_t power_raw;
-float power;
-float power_sum = 0;
-
-uint8_t retval[2] {};
-void ina226_init(void) {
-
-	uint16_t config = INA226_AVG_4 | INA226_VBUS_1100uS | INA226_VSH_1100uS | INA226_MODE_CONT_SHUNT_AND_BUS;
-	retval[0] = config >> 8;
-	retval[1] = config & 0xff;
-
-	HAL_I2C_Mem_Write(&hi2c2, INA226_ADDRESS, INA226_CONFIG, I2C_MEMADD_SIZE_8BIT, retval, 2, 1000);
-	// INA226_setConfig(&hi2c2, INA226_CONFIG, 0x45ff);
-	// current_lsb = 81.96mV / r_shunt / 2^15
-	// calibrate value = 0.00512 / (current_lsb * r_shunt)
-	HAL_I2C_Mem_Write(&hi2c2, INA226_ADDRESS, INA226_CALIB, I2C_MEMADD_SIZE_8BIT, (uint8_t*)"\x08\x00", 2, 1000);
-	// INA226_setCalibrationReg(&hi2c2, INA226_CALIB, 0x0a00);
-}
-
-void ina226_sample(void) {
-	HAL_I2C_Mem_Read(&hi2c2, INA226_ADDRESS, INA226_BUSV, I2C_MEMADD_SIZE_8BIT, retval, 2, 1000);
-	bus_voltage = retval[0] << 8 | retval[1];
-	bus_voltage *= 0.00125;
-
-	HAL_I2C_Mem_Read(&hi2c2, INA226_ADDRESS, INA226_CURRENT, I2C_MEMADD_SIZE_8BIT, retval, 2, 1000);
-	current_raw = retval[0] << 8 | retval[1];  // 因为ina226存在+-2.5uV的误差，所以这里直接使用带符号进行处理避免意外大值
-	current = current_raw;
-	current *= 0.000125;
-
-	HAL_I2C_Mem_Read(&hi2c2, INA226_ADDRESS, INA226_POWER, I2C_MEMADD_SIZE_8BIT, retval, 2, 1000);
-	power_raw = retval[0] << 8 | retval[1];
-	power = power_raw;
-	power *= 0.003125;
-
-	power_sum += power*0.05;
-
-	power_bar.calc(power_raw);
-
-	// 将电压、电流、功率数据传给上位机
-	str_len = xsprintf(strbuf, "ina226: %.4f, %.4f, %.4f\r\n", bus_voltage, current, power);
-	HAL_UART_Transmit_DMA(&huart2, (const uint8_t*)strbuf, str_len);
-}
-// /**
-//  * @brief  初始化INA226
-//  * @param  rShuntValue: 采样电阻值
-//  * @param  iMaxExpected: 期望最大电流值
-//  */
-// void calibrate(float rShuntValue, float iMaxExpected) {
-// 	uint16_t calibrationValue;
-
-// 	float iMaxP
-// }
+bool catcha = false;
+char catcha_buf[128] = {0};
 
 // 浮点数显示
-void show_float(uint8_t x, uint8_t y, const float& num) {
+void show_float(uint8_t x, uint8_t y, const float num) {
 	// 位数控制，保证显示的数字个数为4个
 	uint8_t fixed = 3;
 	if (num >= 10) {
@@ -200,7 +178,19 @@ void show_float(uint8_t x, uint8_t y, const float& num) {
 	} else if (num >= 1000) {
 		fixed = 0;
 	}
-	str_len = xsprintf(strbuf, "%4.*f", fixed, num);
+	str_len = xsprintf(strbuf, "%.*f", fixed, num);
+	// if (str_len > 5) {
+	// 	str_len = 5;
+	// }
+	if (!catcha && str_len > 5 && strbuf[0] != '-') {
+		catcha = true;
+		for (uint8_t i = 0; i < str_len; i++) {
+			catcha_buf[i] = strbuf[i];
+		}
+	}
+	if (catcha) {
+		str_len = xsprintf(strbuf, "%s", catcha_buf);
+	}
 	for (uint8_t i = 0; i < str_len; i++) {
 		if (isnum(strbuf[i])) {
 			ssd1312_showchar(x, y, strbuf[i]-'0', num_10x24, 10, 24);
@@ -249,6 +239,9 @@ void meterUI(void) {
 	ssd1312_showchar(v_x+50, v_y+1, 0, char_V2, 9, 16);
 
 	// 电流
+	// str_len = xsprintf(strbuf, "%f", current);
+	// HAL_UART_Transmit(&huart2, (uint8_t*)strbuf, str_len, 1000);
+	// current *= 1;
 	show_float(c_x, c_y, current);
 	ssd1312_showchar(c_x+50, c_y+1, 0, char_A2, 9, 16);
 
@@ -285,6 +278,8 @@ void power_control(void) {
 	}
 }
 
+
+
 void core(void) {
 
 	// HAL_TIM_Base_Start(&htim3);
@@ -298,7 +293,7 @@ void core(void) {
 	HAL_UARTEx_ReceiveToIdle_DMA(&huart2, (uint8_t*)uart_rx_buf, sizeof(uart_rx_buf));
 
 	// 初始化INA226
-	ina226_init();
+	ina226_init(INA226_AVG_4 | INA226_VBUS_1100uS | INA226_VSH_1100uS | INA226_MODE_CONT_SHUNT_AND_BUS, 20, 1000);
 	clr(CH217_EN);
 
 	// 初始化oled
@@ -352,6 +347,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		}
 	} else if (htim->Instance == TIM17) {
 		ina226_sample();
+		power_sum += power*0.05;
+		power_bar.calc(power_raw);
 	}
 }
 
@@ -404,6 +401,29 @@ void ssd1312_write_bytes(uint8_t addr, uint8_t* data, int len) {
 	HAL_I2C_Mem_Write_DMA(&hi2c1, SSD1312_IIC_ADDRESS, addr, I2C_MEMADD_SIZE_8BIT, data, len);
 }
 
+
+uint8_t ina226_writeReg (uint16_t regAddress, uint16_t regValue) {
+	uint8_t retval[2] = {regValue >> 8, regValue & 0xff};
+	return HAL_I2C_Mem_Write(&hi2c2, INA226_ADDRESS, regAddress, I2C_MEMADD_SIZE_8BIT, retval, 2, 1000);
+}
+// 无符号读取寄存器
+uint16_t ina226_readReg (uint16_t regAddress) {
+	uint8_t retval[2] = {0};
+	if (HAL_I2C_Mem_Read(&hi2c2, INA226_ADDRESS, regAddress, I2C_MEMADD_SIZE_8BIT, retval, 2, 1000) != HAL_OK) {
+		return 0xFFFF;
+	} else {
+		return retval[0] << 8 | retval[1];
+	}
+}
+// 带符号读取寄存器
+int16_t ina226_readRegS (uint16_t regAddress) {
+	uint8_t retval[2] = {0};
+	if (HAL_I2C_Mem_Read(&hi2c2, INA226_ADDRESS, regAddress, I2C_MEMADD_SIZE_8BIT, retval, 2, 1000) != HAL_OK) {
+		return 0x7FFF;
+	} else {
+		return (int16_t)(retval[0] << 8 | retval[1]);
+	}
+}
 
 // ws2812 控制函数
 void ws2812_display(void) {
