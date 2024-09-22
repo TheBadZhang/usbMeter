@@ -164,9 +164,6 @@ public:
 } power_bar;
 
 
-bool catcha = false;
-char catcha_buf[128] = {0};
-
 // 浮点数显示
 void show_float(uint8_t x, uint8_t y, const float num) {
 	// 位数控制，保证显示的数字个数为4个
@@ -182,15 +179,6 @@ void show_float(uint8_t x, uint8_t y, const float num) {
 	// if (str_len > 5) {
 	// 	str_len = 5;
 	// }
-	if (!catcha && str_len > 5 && strbuf[0] != '-') {
-		catcha = true;
-		for (uint8_t i = 0; i < str_len; i++) {
-			catcha_buf[i] = strbuf[i];
-		}
-	}
-	if (catcha) {
-		str_len = xsprintf(strbuf, "%s", catcha_buf);
-	}
 	for (uint8_t i = 0; i < str_len; i++) {
 		if (isnum(strbuf[i])) {
 			ssd1312_showchar(x, y, strbuf[i]-'0', num_10x24, 10, 24);
