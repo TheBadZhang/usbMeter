@@ -1,0 +1,30 @@
+**/*fp-info-cache
+**/*production
+**/*bom
+**/*-backups/**
+**/*.SLDASM
+**/*.SLDPRT
+
+*.kicad_prl
+
+
+
+
+# dot files
+**/.vscode
+**/.settings
+**/.eide
+
+# project out
+**/build
+**/bin
+**/obj
+**/out
+
+# eide template
+*.ept
+*.eide-template
+
+
+**/Core/**
+**/Drivers/**
