@@ -529,7 +529,8 @@
       "/D2-": "usb",
       "/ch217x/VOUT": "POWER",
       "/ina226/VIN+": "POWER",
-      "VBUS": "POWER"
+      "VBUS": "POWER",
+      "VBUS2": "POWER"
     },
     "netclass_patterns": []
   },
@@ -698,6 +699,10 @@
     [
       "6d7c2aa1-eaff-45c7-975d-e3b6e508e21e",
       "rt9193"
+    ],
+    [
+      "b3b2aea3-2826-41dc-b1bb-5a7a7d37ad71",
+      "TPS54202-3v3"
     ],
     [
       "0fa69f8f-e323-491c-8eaf-51ac28ff00d5",

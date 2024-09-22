@@ -1405,7 +1405,7 @@
 			)
 			(project "stm32g031g8u6 点阵 LED"
 				(path "/6dddc248-0757-418f-9598-3c64442fd914/6d7c2aa1-eaff-45c7-975d-e3b6e508e21e"
-					(reference "#PWR025")
+					(reference "#PWR028")
 					(unit 1)
 				)
 			)
@@ -1495,7 +1495,7 @@
 			)
 			(project "stm32g031g8u6 点阵 LED"
 				(path "/6dddc248-0757-418f-9598-3c64442fd914/6d7c2aa1-eaff-45c7-975d-e3b6e508e21e"
-					(reference "#PWR027")
+					(reference "#PWR030")
 					(unit 1)
 				)
 			)
@@ -1585,7 +1585,7 @@
 			)
 			(project "stm32g031g8u6 点阵 LED"
 				(path "/6dddc248-0757-418f-9598-3c64442fd914/6d7c2aa1-eaff-45c7-975d-e3b6e508e21e"
-					(reference "#PWR026")
+					(reference "#PWR029")
 					(unit 1)
 				)
 			)
