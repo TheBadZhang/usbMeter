@@ -70,17 +70,19 @@ void ssd1312_init(uint8_t rotation) {
 		ssd1312_write_byte(0x00, initial_sequence[i]);
 	}
 }
-
+void ssd1312_normalColor(void) {
+	ssd1312_write_byte(0x00, 0xA6); // 设置正常显示
+}
 void ssd1312_invColor(void) {
-	ssd1312_write_byte(0xA6, 0); // 设置正常显示
+	ssd1312_write_byte(0x00, 0xA7); // 设置反色显示
 }
 
 void ssd1312_display_on(void) {
-	ssd1312_write_byte(0xAF, 0); // 打开屏幕
+	ssd1312_write_byte(0x00, 0xAF); // 打开屏幕
 }
 
 void ssd1312_display_off(void) {
-	ssd1312_write_byte(0xAE, 0); // 关闭屏幕
+	ssd1312_write_byte(0x00, 0xAE); // 关闭屏幕
 }
 
 void ssd1312_setRotation(uint8_t rotation) {
@@ -120,7 +122,7 @@ void ssd1312_drawPixel(uint8_t x, uint8_t y, uint8_t t) {
 	}
 }
 
-uint8_t abs(uint8_t x) {
+uint8_t mabs(uint8_t x) {
 	if (x < 0) {
 		return -x;
 	}
@@ -129,8 +131,8 @@ uint8_t abs(uint8_t x) {
 
 void ssd1312_drawLine(uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1, uint8_t t) {
 
-	uint8_t dx = abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
-	uint8_t dy = abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+	uint8_t dx = mabs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+	uint8_t dy = mabs(y1 - y0), sy = y0 < y1 ? 1 : -1;
 	uint8_t erro = (dx > dy ? dx : -dy) / 2;
 
 	while(ssd1312_drawPixel(x0, y0, 1), x0 != x1 || y0 != y1){
@@ -149,10 +151,12 @@ void ssd1312_drawBox(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t t) {
 }
 
 void ssd1312_drawSeg(uint8_t x, uint8_t y, uint8_t t) {
-	if (ssd1312_rotation == 1 || ssd1312_rotation == 3) {
-		if (y < 8 && x < 128) OLED_GRAM[y + x * 8] = t;
-	} else {
-		if (y < 16 && x < 64) OLED_GRAM[y*64 + x] = t;
+	if (x >= 0 && y >= 0) {
+		if (ssd1312_rotation == 1 || ssd1312_rotation == 3) {
+			if (y < 8 && x < 128) OLED_GRAM[y + x * 8] = t;
+		} else {
+			if (y < 16 && x < 64) OLED_GRAM[y*64 + x] = t;
+		}
 	}
 }
 uint8_t ssd1312_getSeg(uint8_t x, uint8_t y) {
@@ -188,7 +192,7 @@ uint8_t isnum(char c) {
 }
 
 void ssd1312_showchar(uint8_t x, uint8_t y, uint8_t num, const uint8_t* font, uint8_t w, uint8_t h) {
-	h/=8;
+	h= (h+7)/8;
 	for (uint8_t i = 0; i < w; i++) {
 		for (uint8_t j = 0; j < h; j++) {
 			// OLED_GRAM[(i+x)*8+j+y] = num_10x24[num][j*10+i];
@@ -197,16 +201,42 @@ void ssd1312_showchar(uint8_t x, uint8_t y, uint8_t num, const uint8_t* font, ui
 		}
 	}
 }
-void ssd1312_showstr(uint8_t x, uint8_t y, const char* str) {
-	uint8_t len = strlen(str);
-	for (uint8_t i = 0; i < len; i++) {
-		if (isnum(str[i]))
-		ssd1312_showchar(x, y, str[i]-'0', num_10x24, 10, 24);
-		if (x > ssd1312_rotation == 0 ? 128-10 : 64-10) {
-			x = 0;
-			y += 3;
+/**
+ * @brief 字符串绘制函数
+ * @param x x坐标
+ * @param y y坐标
+ * @param str 字符串
+ * @param str_len 字符串长度
+ * @param font 字体数据
+ * @param w 字体宽度
+ * @param h 字体高度
+ * @param spacing_x 字符间距
+ * @param newline 最大显示行数
+ */
+void ssd1312_showstr(short x, short y, const char* str, const uint8_t str_len, const uint8_t* font, uint8_t w, uint8_t h, uint8_t spacing_x, int8_t newline) {
+	uint8_t ww = ((ssd1312_rotation == 0 || ssd1312_rotation == 2)? 128-w : 64-w);
+	for (uint8_t i = 0; i < str_len; i++) {
+		// if (isnum(str[i]))
+		if (x >= -w && x <= ww) {
+			ssd1312_showchar(x, y, str[i]-' ', font, w, h);
+		}
+		if (x > ww) {
+			if (--newline > 0) {
+					x = x-ww;
+					y += h/8+1;
+			} else {
+				return;
+			}
 		} else {
-			x += 11;
+			x += w+spacing_x;
+		}
+	}
+}
+
+void ssd1312_drawXBMP(uint8_t x, uint8_t y, uint8_t* bmp, uint8_t w, uint8_t h) {
+	for (uint8_t i = 0; i < w; i++) {
+		for (uint8_t j = 0; j < h; j++) {
+			ssd1312_drawSeg(x+i, y+j, bmp[j*w+i]);
 		}
 	}
 }

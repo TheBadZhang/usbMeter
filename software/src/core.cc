@@ -23,7 +23,6 @@ uint8_t str_len = 0;
 
 
 
-
 char uart_rx_buf[32];
 
 bool CH217_OUT_FLAG = true;
@@ -47,7 +46,13 @@ void ina226_sample(void) {
 	power = ina226_getPower();
 
 	// 将电压、电流、功率数据传给上位机
-	str_len = sprintf(strbuf, "ina226: %.4f, %.4f, %.4f\r\n", bus_voltage, current, current_lsb*1000);
+	int bus_voltage_i = bus_voltage * 10000;
+	int current_i = current * 10000;
+	int power_i = power*10000;
+	str_len = sprintf(strbuf, "ina226: %d.%04d, %d.%04d, %d.%04d\r\n",
+		bus_voltage_i/10000, bus_voltage_i%10000,
+		current_i/10000, current_i%10000,
+		power_i/10000, power_i%10000);
 	HAL_UART_Transmit_DMA(&huart2, (const uint8_t*)strbuf, str_len);
 }
 
@@ -122,12 +127,13 @@ public:
 
 			//* 样式2
 			for (uint8_t i = hw; i < hw+1+d; i++) {
-				if (i%2==0)
-				if ((i-hw) % 10 == 0) {
-					ssd1312_showchar(i-2, y+1, (i-hw)/10, num_6x8, 6, 8);
-					ssd1312_drawSeg(i, y, 0x7f);
-				} else {
-					ssd1312_drawSeg(i, y, 0x78);
+				if (i%2==0) {
+					if ((i-hw) % 10 == 0) {
+						ssd1312_showchar(i-2, y+1, (i-hw)/10, num_6x8, 6, 8);
+						ssd1312_drawSeg(i, y, 0x7f);
+					} else {
+						ssd1312_drawSeg(i, y, 0x78);
+					}
 				}
 			}
 
@@ -139,12 +145,13 @@ public:
 
 			//* 样式2
 			for (uint8_t i = hw; i > hw-1+d; i--) {
-				if (i%2==0)
-				if ((hw-i) % 10 == 0) {
-					ssd1312_showchar(i-2, y+1, (hw-i)/10, num_6x8, 6, 8);
-					ssd1312_drawSeg(i, y, 0x7f);
-				} else {
-					ssd1312_drawSeg(i, y, 0x78);
+				if (i%2==0) {
+					if ((hw-i) % 10 == 0) {
+						ssd1312_showchar(i-2, y+1, (hw-i)/10, num_6x8, 6, 8);
+						ssd1312_drawSeg(i, y, 0x7f);
+					} else {
+						ssd1312_drawSeg(i, y, 0x78);
+					}
 				}
 			}
 		}
@@ -164,18 +171,19 @@ void show_float(uint8_t x, uint8_t y, const float num) {
 	} else if (num >= 10) {
 		fixed = 2;
 	}
-	str_len = sprintf(strbuf, "%.*f", fixed, num);
+	// -u _printf_float
+	// str_len = sprintf(strbuf, "%.*f", fixed, num);         // 如果空间充足的话可以使用这个输出浮点数
+	int out_num = num*1000;
+	str_len = sprintf(strbuf, "%d.%0*d", out_num/1000, fixed, out_num%1000);
 	// 因为画面中只能显示5位数字，所以这边设吹了人为上限为 5 位
 	for (uint8_t i = 0; i < 5; i++) {
 		if (isnum(strbuf[i])) {
 			ssd1312_showchar(x, y, strbuf[i]-'0', num_10x24, 10, 24);
 			x += 11;
-		} else if (strbuf[i] == '.') {
+		} else if (strbuf[i] == '.' && i != 4) {
 			ssd1312_drawBox(x+1, y*8+18, 3, 3, 1);
 			x += 6;
-		} else {
-			x;
-		}
+		}// 否则什么也不做
 	}
 }
 
@@ -186,6 +194,8 @@ void meterUI(void) {
 	uint8_t p_x, p_y;
 	uint8_t pm_x, pm_y;
 	uint8_t pb_y;
+	static int str_x = 0;
+	static bool str_reverse = false;
 
 	if (ssd1312_rotation == 1 || ssd1312_rotation == 3) {
 		v_x = 0;
@@ -233,6 +243,32 @@ void meterUI(void) {
 	ssd1312_showchar(pm_x+50, pm_y+1, 0, char_W, 6, 8);
 	ssd1312_showchar(pm_x+50+6, pm_y+1, 0, char_m, 6, 8);
 
+
+	// 竖屏显示下会多一块区域可以用于额外信息的显示
+	if (ssd1312_rotation == 0 || ssd1312_rotation == 2) {
+		str_len = sprintf(strbuf, "THIS IS A SO FUCKING LONG SCENTANCE THAT CANNOT DISPLAY NORMALLY!!");
+		int8_t lines = 2;
+		// ssd1312_showstr(str_x, 12, strbuf, 0, font_Fixedsys, 8, 16, 1, 2);
+		// ssd1312_showstr(str_x, 12, strbuf, 0, font0816, 8, 16, 1, 2);
+		ssd1312_showstr(str_x, 12, strbuf, str_len, font_0507, 5, 7, 1, 2);
+		if (str_reverse) {
+			if (str_x >= 0) {
+				str_reverse = false;
+			} else {
+				str_x ++;
+			}
+		} else {
+			if (str_x+(str_len)*5 <= 64*lines) {
+				str_reverse = true;
+			} else {
+				str_x--;
+			}
+		}
+
+\
+		ssd1312_showchar(0, 12, 0, usbmeter2, 64, 16);
+	}
+
 	// 功率条（当前功率与近一段时间平均功率比值）
 	power_bar.draw(pb_y);
 
@@ -257,8 +293,6 @@ void power_control(void) {
 	}
 }
 
-
-
 void core(void) {
 
 	// HAL_TIM_Base_Start(&htim3);
@@ -278,14 +312,17 @@ void core(void) {
 
 	// 初始化oled
 	ssd1312_init(2);
+
 	if (ssd1312_rotation == 1 || ssd1312_rotation == 3) {
 		power_bar.set_w(128);
 	} else {
 		power_bar.set_w(64);
 	}
 
+
 	while (1) {
 
+		// 电源控制 true 打开输出 false 关闭输出
 		if (CH217_OUT_FLAG) {
 			clr(CH217_EN);
 		} else {
@@ -314,13 +351,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		}
 		if (!read(KEY2)) {
 			uint32_t color = colors[0];
-			for(int i = 0; i < sizeof(colors)/sizeof(uint32_t)-1; i++) {
+			for(uint16_t i = 0; i < sizeof(colors)/sizeof(uint32_t)-1; i++) {
 				// colors[i] = tbz::rand();
 				colors[i] = colors[i+1];
 			}
 			colors[sizeof(colors)/sizeof(uint32_t)-1] = color;
 			ws2812_convert (colors, sizeof(colors)/sizeof(uint32_t));
-			for (int i = 72; i < 140; i++) {
+			for (int i = 72; i < 128; i++) {
 				buffer[i] = WS_RESET;
 			}
 			ws2812_display();
@@ -351,7 +388,9 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
 					CH217_OUT_FLAG = false;
 				}
 			} else if (my_compare("WS2812=", uart_rx_buf+3)) {
-				sscanf(uart_rx_buf+10, "%x,%x,%x,%x", &colors[0], &colors[1], &colors[2], &colors[3]);
+				sscanf(uart_rx_buf+10, "%x,%x,%x,%x",
+					(unsigned int*)(&colors[0]), (unsigned int*)(&colors[1]),
+					(unsigned int*)(&colors[2]), (unsigned int*)(&colors[3]));
 				ws2812_convert (colors, sizeof(colors)/sizeof(uint32_t));
 				ws2812_display();
 			}
@@ -383,7 +422,7 @@ void ssd1312_write_bytes(uint8_t addr, uint8_t* data, int len) {
 
 
 uint8_t ina226_writeReg (uint16_t regAddress, uint16_t regValue) {
-	uint8_t retval[2] = {regValue >> 8, regValue & 0xff};
+	uint8_t retval[2] = {(uint8_t)(regValue >> 8), (uint8_t)(regValue & 0xff)};
 	return HAL_I2C_Mem_Write(&hi2c2, INA226_ADDRESS, regAddress, I2C_MEMADD_SIZE_8BIT, retval, 2, 1000);
 }
 // 无符号读取寄存器

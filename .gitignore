@@ -28,3 +28,10 @@
 
 **/Core/**
 **/Drivers/**
+.clang-format
+.mxproject
+Makefile
+startup_stm32g031xx.s
+software/STM32G031G8Ux_FLASH.ld
+software/usbMeter.code-workspace
+software/.gitignore

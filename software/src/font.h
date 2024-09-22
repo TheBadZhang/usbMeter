@@ -20,10 +20,23 @@ extern const uint8_t char_A[];
 extern const uint8_t char_W[];
 extern const uint8_t char_H[];
 
+extern const unsigned char font_0507 [];
+
+
+// 8*16
+extern const unsigned char font_Fixedsys [];
+extern const unsigned char font0816 [];
+
 // 9*16
 extern const uint8_t char_V2[];
 extern const uint8_t char_A2[];
 extern const uint8_t char_W2[];
+
+
+extern const uint8_t usbmeter1[];
+extern const uint8_t usbmeter2[];
+extern const uint8_t usbmeter3[];
+
 
 #ifdef __cplusplus
 }
