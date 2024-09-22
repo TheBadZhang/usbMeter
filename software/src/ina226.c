@@ -19,9 +19,8 @@ void ina226_init(uint16_t config, float r_shunt, float maxExpectedCurrent) {
 	// current_lsb(mA) = maxExpectedCurrent(mA) / 32768
 	// calib = 0.00512 / (current_lsb(mA) * r_shunt(mΩ))
 	current_lsb = maxExpectedCurrent / 32768.0;
-	power_lsb = current_lsb * 25 / 1000;
+	power_lsb = current_lsb * 25;
 	uint16_t calib = 5120 / (current_lsb * r_shunt);
-	current_lsb /= 1000;
 	ina226_setCalibrationReg(calib);
 }
 
@@ -32,11 +31,18 @@ float ina226_getBusV (void) {
 	return ina226_readReg(INA226_BUSV) * INA226_BUSV_LSB;
 }
 
+/**
+ * @brief INA226 读取电流数值寄存器(mA)
+ */
 float ina226_getCurrent (void) {
 	// 因为ina226的SHUNT_V存在+-2.5uV的误差，所以这里直接使用带符号进行处理避免意外大值
-	return ina226_readRegS(INA226_CURRENT) * current_lsb;
+	return (int16_t)(ina226_readReg(INA226_CURRENT)) * current_lsb;
 }
 
+
+/**
+ * @brief INA226 读取功率数值寄存器(mW)
+ */
 float ina226_getPower (void) {
 	return ina226_getPowerReg() * power_lsb;
 }

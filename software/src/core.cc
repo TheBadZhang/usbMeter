@@ -4,7 +4,7 @@
 #include "trick.h"
 #include "main.h"
 
-#include "xprintf.h"
+#include <stdio.h>
 char strbuf[128] = {0};
 uint8_t str_len = 0;
 
@@ -47,20 +47,9 @@ void ina226_sample(void) {
 	power = ina226_getPower();
 
 	// 将电压、电流、功率数据传给上位机
-	str_len = xsprintf(strbuf, "ina226: %.4f, %.4f, %.4f\r\n", bus_voltage, current, current_lsb*1000);
+	str_len = sprintf(strbuf, "ina226: %.4f, %.4f, %.4f\r\n", bus_voltage, current, current_lsb*1000);
 	HAL_UART_Transmit_DMA(&huart2, (const uint8_t*)strbuf, str_len);
 }
-// /**
-//  * @brief  初始化INA226
-//  * @param  rShuntValue: 采样电阻值
-//  * @param  iMaxExpected: 期望最大电流值
-//  */
-// void calibrate(float rShuntValue, float iMaxExpected) {
-// 	uint16_t calibrationValue;
-
-// 	float iMaxP
-// }
-
 
 
 
@@ -168,18 +157,16 @@ public:
 void show_float(uint8_t x, uint8_t y, const float num) {
 	// 位数控制，保证显示的数字个数为4个
 	uint8_t fixed = 3;
-	if (num >= 10) {
-		fixed = 2;
+	if (num >= 1000) {
+		fixed = 0;
 	} else if (num >= 100) {
 		fixed = 1;
-	} else if (num >= 1000) {
-		fixed = 0;
+	} else if (num >= 10) {
+		fixed = 2;
 	}
-	str_len = xsprintf(strbuf, "%.*f", fixed, num);
-	// if (str_len > 5) {
-	// 	str_len = 5;
-	// }
-	for (uint8_t i = 0; i < str_len; i++) {
+	str_len = sprintf(strbuf, "%.*f", fixed, num);
+	// 因为画面中只能显示5位数字，所以这边设吹了人为上限为 5 位
+	for (uint8_t i = 0; i < 5; i++) {
 		if (isnum(strbuf[i])) {
 			ssd1312_showchar(x, y, strbuf[i]-'0', num_10x24, 10, 24);
 			x += 11;
@@ -227,15 +214,19 @@ void meterUI(void) {
 	ssd1312_showchar(v_x+50, v_y+1, 0, char_V2, 9, 16);
 
 	// 电流
-	// str_len = xsprintf(strbuf, "%f", current);
+	// str_len = sprintf(strbuf, "%f", current);
 	// HAL_UART_Transmit(&huart2, (uint8_t*)strbuf, str_len, 1000);
 	// current *= 1;
 	show_float(c_x, c_y, current);
-	ssd1312_showchar(c_x+50, c_y+1, 0, char_A2, 9, 16);
+	// ssd1312_showchar(c_x+50, c_y+1, 0, char_A2, 9, 16);
+	ssd1312_showchar(c_x+50, c_y+1, 0, char_m, 6, 8);
+	ssd1312_showchar(c_x+50+6, c_y+1, 0, char_A, 6, 8);
 
 	// 功率
 	show_float(p_x, p_y, power);
-	ssd1312_showchar(p_x+50, p_y+1, 0, char_W2, 9, 16);
+	// ssd1312_showchar(p_x+50, p_y+1, 0, char_W2, 9, 16);
+	ssd1312_showchar(p_x+50, p_y+1, 0, char_m, 6, 8);
+	ssd1312_showchar(p_x+50+6, p_y+1, 0, char_W, 6, 8);
 
 	// 累计功率（瓦分钟）
 	show_float(pm_x, pm_y, power_sum/60.0);
@@ -281,7 +272,8 @@ void core(void) {
 	HAL_UARTEx_ReceiveToIdle_DMA(&huart2, (uint8_t*)uart_rx_buf, sizeof(uart_rx_buf));
 
 	// 初始化INA226
-	ina226_init(INA226_AVG_4 | INA226_VBUS_1100uS | INA226_VSH_1100uS | INA226_MODE_CONT_SHUNT_AND_BUS, 20, 1000);
+	// 16 次采样取平均值，VBUS和VSHUNT ADC转换时间 2.116ms
+	ina226_init(INA226_AVG_16 | INA226_VBUS_2116uS | INA226_VSH_2116uS | INA226_MODE_CONT_SHUNT_AND_BUS, 20, 1000);
 	clr(CH217_EN);
 
 	// 初始化oled
@@ -335,7 +327,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		}
 	} else if (htim->Instance == TIM17) {
 		ina226_sample();
-		power_sum += power*0.05;
+		power_sum += power*0.00005;
 		power_bar.calc(power_raw);
 	}
 }
@@ -401,15 +393,6 @@ uint16_t ina226_readReg (uint16_t regAddress) {
 		return 0xFFFF;
 	} else {
 		return retval[0] << 8 | retval[1];
-	}
-}
-// 带符号读取寄存器
-int16_t ina226_readRegS (uint16_t regAddress) {
-	uint8_t retval[2] = {0};
-	if (HAL_I2C_Mem_Read(&hi2c2, INA226_ADDRESS, regAddress, I2C_MEMADD_SIZE_8BIT, retval, 2, 1000) != HAL_OK) {
-		return 0x7FFF;
-	} else {
-		return (int16_t)(retval[0] << 8 | retval[1]);
 	}
 }
 
